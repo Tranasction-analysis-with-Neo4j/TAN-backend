@@ -43,6 +43,23 @@ const initiateTransaction = async(req, res)=>{
 
     const session = driver.session();
     try{
+        const response = await session.readTransaction(txn => txn.run(
+            `MATCH (t:Transaction)
+            RETURN t.name as Product`
+        ))
+        let data = response.records.map(row => row.get('Product'));
+        
+        if(data.length<1){
+            await session.writeTransaction(tx=> tx.run(`
+                MERGE (t1:Transaction{name:"topup"})
+                MERGE (t2:Transaction{name:"airTicketing"})
+                MERGE (t3:Transaction{name:"fundTransfer"})
+                MERGE (t4:Transaction{name:"electricity"})
+                MERGE (t5:Transaction{name:"noc"})
+                MERGE (t6:Transaction{name:"loadWallet"})
+                MERGE (t7:Transaction{name:"internet"})
+        `,{}))
+        }
         const checkVerify = await session.writeTransaction(tx=> tx.run(`
         MATCH (user:TestUser {name: $user})
         MATCH (transaction:Transaction {name:$product})
@@ -67,7 +84,6 @@ const initiateTransaction = async(req, res)=>{
             `,{user, product}))
     
             let data = response.records.map(row => toNativeTypes(row.get('transaction').properties));
-            console.log(data)
             res.json({product: data, status:"initated"})
         }
     }
@@ -95,7 +111,7 @@ const verifyTransaction = async(req, res)=>{
         `,{user, product}))
 
         let data = response.records.map(row => toNativeTypes(row.get('transaction').properties));
-        console.log(data)
+        console.log('transaction',data)
         res.json({product: data, status:"verifed"})
     }
     catch(err){
@@ -140,6 +156,25 @@ const getProduct = async(req, res)=>{
             RETURN t.name as Product`
         ))
         let data = response.records.map(row => row.get('Product'));
+        console.log(data,'--')
+        if(data.length < 1){
+            const response = await session.writeTransaction(tx=> tx.run(`
+                MERGE (ticket:Transaction {name: "airTicketing"})
+                MERGE (transfer: Transaction {name: "fundTransfer"})
+                MERGE (electricity: Transaction {name:"electricity"})
+                MERGE (noc: Transaction {name: "noc"})
+                MERGE (load: Transaction {name: "loadWallet"})
+                MERGE (internet: Transaction {name: "internet"})
+                WITH *
+                MATCH (t:Transaction)
+                RETURN t.name as Product
+                RETURN r
+        `,{}))
+        let seedResponse = response.records.map(row => row.get('Product'));
+            if(seedResponse){
+                console.log("data seeded")
+            }
+        }
         res.json({message: data})
     }
     catch(err){
